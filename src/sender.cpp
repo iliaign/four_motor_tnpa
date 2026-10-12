@@ -9,9 +9,10 @@
 // Джойстик 2 (поворот):
 //   GND -> GND
 //   +5V -> 3V3
-//   URX -> GPIO32
-//   URY -> GPIO33   (резерв, пока не используется приёмником)
+//   URX -> GPIO32   (резерв: уходит в кадр как y2, приёмник пока не использует)
+//   URY -> GPIO33   (ПОВОРОТ: уходит в кадр как x2)
 //   SW  -> не подключаем
+//   Оси второго джойстика поменяны местами в коде: проводку менять не нужно.
 // Линия связи: см. protocol.h
 //
 // Кнопка: ОДНО нажатие переключает режим (0 = нейтраль, 1 = управление моторами).
@@ -22,8 +23,8 @@
 
 constexpr uint8_t PIN_X1 = 34;
 constexpr uint8_t PIN_Y1 = 35;
-constexpr uint8_t PIN_X2 = 32;
-constexpr uint8_t PIN_Y2 = 33;
+constexpr uint8_t PIN_J2_URX = 32;  // выход URX второго джойстика
+constexpr uint8_t PIN_J2_URY = 33;  // выход URY второго джойстика
 constexpr uint8_t PIN_SW = 25;
 
 constexpr uint32_t SEND_PERIOD_MS = 20;   // 50 кадров в секунду
@@ -113,7 +114,7 @@ class LinkTx {
 };
 
 Joystick joy1(PIN_X1, PIN_Y1);
-Joystick joy2(PIN_X2, PIN_Y2);
+Joystick joy2(PIN_J2_URY, PIN_J2_URX);  // X и Y поменяны местами: поворот снимается с URY
 ModeButton modeButton(PIN_SW, DEBOUNCE_MS);
 LinkTx link;
 Periodic sendTimer(SEND_PERIOD_MS);
