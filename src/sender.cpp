@@ -1,11 +1,17 @@
-// ESP32 №1: читает джойстик и шлёт кадры по проводной линии (UART2, позже RS-485).
+// ESP32 №1: пульт. Читает два джойстика и шлёт кадры по проводной линии (UART2, позже RS-485).
 //
-// Подключение джойстика:
+// Джойстик 1 (вперёд/назад + вверх/вниз):
 //   GND -> GND
 //   +5V -> 3V3   (питаем от 3.3 В, чтобы выходы осей не превышали 3.3 В для АЦП ESP32)
 //   URX -> GPIO34
 //   URY -> GPIO35
-//   SW  -> GPIO25
+//   SW  -> GPIO25   (кнопка режима)
+// Джойстик 2 (поворот):
+//   GND -> GND
+//   +5V -> 3V3
+//   URX -> GPIO32
+//   URY -> GPIO33   (резерв, пока не используется приёмником)
+//   SW  -> не подключаем
 // Линия связи: см. protocol.h
 //
 // Кнопка: ОДНО нажатие переключает режим (0 = нейтраль, 1 = управление моторами).
@@ -14,8 +20,10 @@
 #include <Arduino.h>
 #include "protocol.h"
 
-constexpr uint8_t PIN_X = 34;
-constexpr uint8_t PIN_Y = 35;
+constexpr uint8_t PIN_X1 = 34;
+constexpr uint8_t PIN_Y1 = 35;
+constexpr uint8_t PIN_X2 = 32;
+constexpr uint8_t PIN_Y2 = 33;
 constexpr uint8_t PIN_SW = 25;
 
 constexpr uint32_t SEND_PERIOD_MS = 20;   // 50 кадров в секунду
@@ -91,8 +99,8 @@ class LinkTx {
     Serial2.begin(LINK_BAUD, SERIAL_8N1, PIN_LINK_RX, PIN_LINK_TX);
   }
 
-  void send(int16_t x, int16_t y, uint8_t mode) {
-    Frame f = makeFrame(x, y, mode, seq_++);
+  void send(int16_t x, int16_t y, int16_t x2, int16_t y2, uint8_t mode) {
+    Frame f = makeFrame(x, y, x2, y2, mode, seq_++);
     Serial2.write((const uint8_t *)&f, sizeof(f));
     sent_++;
   }
@@ -104,7 +112,8 @@ class LinkTx {
   uint32_t sent_ = 0;
 };
 
-Joystick joystick(PIN_X, PIN_Y);
+Joystick joy1(PIN_X1, PIN_Y1);
+Joystick joy2(PIN_X2, PIN_Y2);
 ModeButton modeButton(PIN_SW, DEBOUNCE_MS);
 LinkTx link;
 Periodic sendTimer(SEND_PERIOD_MS);
@@ -112,7 +121,8 @@ Periodic printTimer(PRINT_PERIOD_MS);
 
 void setup() {
   Serial.begin(115200);  // USB, для отладки
-  joystick.begin();
+  joy1.begin();
+  joy2.begin();
   modeButton.begin();
   link.begin();
   Serial.println("Sender ready, mode NEUTRAL");
@@ -126,11 +136,14 @@ void loop() {
 
   if (!sendTimer.due()) return;
 
-  int16_t x = joystick.readX();
-  int16_t y = joystick.readY();
-  link.send(x, y, modeButton.mode());
+  int16_t x1 = joy1.readX();
+  int16_t y1 = joy1.readY();
+  int16_t x2 = joy2.readX();
+  int16_t y2 = joy2.readY();
+  link.send(x1, y1, x2, y2, modeButton.mode());
 
   if (printTimer.due()) {
-    Serial.printf("sent=%lu x=%d y=%d mode=%d\n", (unsigned long)link.sent(), x, y, modeButton.mode());
+    Serial.printf("sent=%lu J1(x=%d y=%d) J2(x=%d y=%d) mode=%d\n", (unsigned long)link.sent(),
+                  x1, y1, x2, y2, modeButton.mode());
   }
 }
